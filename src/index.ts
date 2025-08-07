@@ -76,26 +76,6 @@ server.tool(
   },
 )
 
-server.tool(
-  "read-code-indexing-instructions",
-  "Get instructions of how to index the code for code reader",
-  {
-    rootPath: z.string().describe("The full path to the root of the project. You can use `pwd` to get the current working directory."),
-    fileName: z.string().optional().default("code-indexing-instructions.md").describe("The name of the file to read. You can use `ls` to get the list of files in the current directory."),
-  },
-  async ({ rootPath, fileName }) => {
-    const instructions = await readFile(join(rootPath, fileName), "utf-8")
-    return {
-      content: [
-        {
-          type: "text",
-          text: instructions,
-        },
-      ],
-    }
-  },
-)
-
 async function parseGitignore(rootPath: string): Promise<string[]> {
   try {
     const gitignoreContent = await readFile(join(rootPath, ".gitignore"), "utf-8")
@@ -254,11 +234,11 @@ function matchesQuery(blockTags: Record<string, string[]>, queryScopes: Array<{ 
 }
 
 server.tool(
-  "read-code",
-  "Read the code of the project that matches the query",
+  "read-code-index",
+  "Read code from the project by querying with scopes and tags. Refer to `code-indexing-instructions.md` for available scopes and tags.",
   {
     folderPath: z.string().describe("The full path to the folder to read the code from. You can use `pwd` to get the current working directory."),
-    query: z.string().describe("The query to read the code. It should be a list of scope and tag. | represents or, & represents and. Square bracket represents a scope. Example: [feature:auth|payment]&[category:math&random]"),
+    query: z.string().describe("The query using scopes and tags to find code. See `code-indexing-instructions.md`. Use '|' for OR, '&' for AND. Scopes are in brackets. Example: [feature:auth|payment]&[category:math&random]"),
     respectGitignore: z.boolean().optional().default(true).describe("Whether to respect .gitignore patterns when scanning files"),
   },
   async ({ folderPath, query, respectGitignore }) => {

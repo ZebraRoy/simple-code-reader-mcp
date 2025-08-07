@@ -9,12 +9,18 @@ const server = new McpServer({
   name: "simple-code-reader-mcp",
   version: "0.1.0",
   title: "Read code using specific markdown",
-  capabilities: {},
+  capabilities: {
+    resources: {},
+    tools: {},
+  },
 })
 
-server.tool(
+server.registerTool(
   "create-code-indexing-instructions",
-  "Create instructions of how to index the code for code reader",
+  {
+    title: "Create code indexing instructions",
+    description: "Create instructions of how to index the code for code reader",
+  },
   async () => {
     return {
       content: [
@@ -233,15 +239,18 @@ function matchesQuery(blockTags: Record<string, string[]>, queryScopes: Array<{ 
   return operator === "and" ? scopeMatches.every(Boolean) : scopeMatches.some(Boolean)
 }
 
-server.tool(
+server.registerTool(
   "read-code-index",
-  "Read code from the project by querying with scopes and tags. Refer to `code-indexing-instructions.md` for available scopes and tags.",
   {
-    folderPath: z.string().describe("The full path to the folder to read the code from. You can use `pwd` to get the current working directory."),
-    query: z.string().describe("The query using scopes and tags to find code. See `code-indexing-instructions.md`. Use '|' for OR, '&' for AND. Scopes are in brackets. Example: [feature:auth|payment]&[category:math&random]"),
-    respectGitignore: z.boolean().optional().default(true).describe("Whether to respect .gitignore patterns when scanning files"),
+    title: "Read code tool",
+    description: "Read code from the project by querying with scopes and tags. Refer to `code-indexing-instructions.md` for available scopes and tags.",
+    inputSchema: {
+      folderPath: z.string().describe("The full path to the folder to read the code from. You can use `pwd` to get the current working directory."),
+      query: z.string().describe("The query using scopes and tags to find code. See `code-indexing-instructions.md`. Use '|' for OR, '&' for AND. Scopes are in brackets. Example: [feature:auth|payment]&[category:math&random]"),
+      respectGitignore: z.boolean().optional().default(true).describe("Whether to respect .gitignore patterns when scanning files"),
+    },
   },
-  async ({ folderPath, query, respectGitignore }) => {
+  async ({ folderPath, query, respectGitignore }: { folderPath: string, query: string, respectGitignore: boolean }) => {
     try {
       const files = await scanFiles(folderPath, folderPath, respectGitignore)
       const { scopes, operator } = parseQuery(query)

@@ -1,0 +1,47 @@
+{
+  "name": "simple-code-reader-mcp",
+  "version": "0.1.0",
+  "description": "A simple code reader MCP server",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ZebraRoy/simple-code-reader-mcp.git"
+  },
+  "bin": {
+    "simple-code-reader-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "lint": "eslint \"**/*.{js,ts,jsx,tsx}\" --fix",
+    "dev": "pnpm build && node dist/index.js",
+    "build": "tsc",
+    "prepublishOnly": "pnpm run build"
+  },
+  "keywords": [
+    "modelcontextprotocol",
+    "mcp",
+    "code-reader"
+  ],
+  "author": "ZebraRoy",
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "bugs": {
+    "url": "https://github.com/ZebraRoy/simple-code-reader-mcp/issues"
+  },
+  "homepage": "https://github.com/ZebraRoy/simple-code-reader-mcp#readme",
+  "packageManager": "pnpm@10.11.0",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.1",
+    "zod": "^4.0.15"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.32.0",
+    "@stylistic/eslint-plugin": "^5.2.2",
+    "@types/node": "^24.2.0",
+    "eslint": "^9.32.0",
+    "globals": "^16.3.0",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.39.0"
+  }
+}

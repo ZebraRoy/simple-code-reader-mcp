@@ -26,55 +26,150 @@ server.registerTool(
       content: [
         {
           type: "text",
-          text: `The code indexing instructions should be named "code-indexing-instructions.md" and placed in the root of the project. The instructions should be in markdown format. Here is the example format of instruction:
+          text: `The code indexing instructions should be named "code-indexing-instructions.md" and placed in the root of the project. The instructions should be in markdown format. Here is the enhanced format of instruction to support feature-based queries, data flow tracking, and cross-cutting concerns:
+
           \`\`\`markdown
           # Code Indexing Instructions
 
-          Use [scope:tag,tag,tag] to describe the scope of the code.
+          Use [scope:tag,tag,tag] to describe the scope of the code. Multiple scopes can be used to provide comprehensive indexing.
 
           \`\`\`javascript
           /**
-           * Some description of the code
-           * [feature:utility]
-           * [category:math,random]
+           * Validates user authentication and returns user data
+           * [feature:auth]
+           * [layer:service]
            * [type:function]
+           * [data-flow:user-input,validation,database]
+           * [api:endpoint]
+           * [concern:security,validation]
            */
-          function getRandomArbitrary(min, max) {
-            return Math.random() * (max - min) + min;
+          async function validateUser(token) {
+            // validation logic
+            return userData;
           }
 
-          ## Scope: Feature
-
-          Feature is the name of the feature of the code. We have the following features:
-          - utility
-          - auth: authentication
-          - payment: payment processing
-
-          ## Scope: Category
-
-          Category is the category of the code. We have the following categories:
-          - math: mathematical
-          - random: random number generation
-          - string: string manipulation
-          - array: array manipulation
-          - object: object manipulation
-
-          ## Scope: Type
-
-          Type is the type of the code. We have the following types:
-          - function
-          - class
-          - interface
-          - enum
-          \`\`\`
+          /**
+           * Adds authentication header to all API requests
+           * [feature:auth]
+           * [layer:middleware]
+           * [type:function]
+           * [data-flow:request-intercept,header-injection]
+           * [api:middleware,header]
+           * [concern:security,cross-cutting]
+           */
+          function addAuthHeader(config) {
+            config.headers.Authorization = \`Bearer \${token}\`;
+            return config;
+          }
           \`\`\`
 
-          Different projects should have different kind of \`scope\` and \`tag\` to describe the code.
-          You should think carefully, the purpose of this tool is to help agent to read the code.
-          Scope should be diverse and comprehensive.
-          Tag should be specific, precise and concise, no verbose description.
+          ## Core Scopes for Feature-Based Development
 
-          Make sure agent can create proper scope and tag for the code.
+          ### Scope: Feature
+          Identifies business features and functional domains. Examples:
+          - auth: authentication and authorization
+          - payment: payment processing and billing
+          - user-management: user profiles and account management
+          - notification: messaging and alerts
+          - reporting: analytics and data visualization
+          - search: search functionality and indexing
+          - file-upload: file handling and storage
+          - admin: administrative functions
+
+          ### Scope: Layer
+          Describes architectural layers for understanding code organization:
+          - controller: request handling and routing
+          - service: business logic and domain operations  
+          - repository: data access and persistence
+          - middleware: request/response processing
+          - model: data structures and entities
+          - view: presentation and UI components
+          - utility: helper functions and shared code
+
+          ### Scope: API
+          Identifies API-related code for endpoint discovery:
+          - endpoint: REST API endpoints
+          - route: routing definitions
+          - middleware: API middleware
+          - header: header manipulation
+          - auth: API authentication
+          - validation: request/response validation
+          - serialization: data transformation
+
+          ### Scope: Data-Flow
+          Tracks data movement and transformation for understanding feature flows:
+          - user-input: receives user data
+          - validation: validates data
+          - database: database operations
+          - external-api: calls external services
+          - cache: caching operations
+          - queue: message queuing
+          - transform: data transformation
+          - response: response generation
+          - request-intercept: intercepts requests
+          - header-injection: adds headers
+
+          ### Scope: Concern
+          Identifies cross-cutting concerns that span multiple features:
+          - security: security-related code
+          - logging: logging and monitoring
+          - caching: caching strategies
+          - validation: data validation
+          - error-handling: error management
+          - performance: performance optimizations
+          - cross-cutting: affects multiple features
+          - config: configuration management
+
+          ### Scope: Type
+          Describes code structure types:
+          - function: functions and methods
+          - class: class definitions
+          - interface: type interfaces
+          - enum: enumeration types
+          - component: UI components
+          - hook: custom hooks (React/Vue)
+          - constant: constants and configurations
+
+          ## Query Examples for Common Use Cases
+
+          ### Get all API-related code for a feature:
+          \`[feature:auth]&[api:endpoint|middleware|header]\`
+
+          ### Understand data flow of a feature:
+          \`[feature:payment]&[data-flow:user-input|validation|database|response]\`
+
+          ### Find how to add headers to all APIs:
+          \`[api:header|middleware]&[concern:cross-cutting]\`
+
+          ### Get all authentication-related code:
+          \`[feature:auth]|[concern:security]\`
+
+          ### Find service layer code for user management:
+          \`[feature:user-management]&[layer:service]\`
+
+          ## Best Practices
+
+          1. **Comprehensive Tagging**: Use multiple scopes to provide rich context
+          2. **Feature-First**: Always include feature scope for business domain identification
+          3. **Layer Awareness**: Include layer scope to understand architectural position
+          4. **Data Flow Tracking**: Use data-flow scope to trace information movement
+          5. **Cross-Cutting Identification**: Tag code that affects multiple features
+          6. **Consistent Naming**: Use consistent tag names across the project
+          7. **Specific Tags**: Prefer specific tags over generic ones
+          8. **API Documentation**: Always tag API-related code for discoverability
+
+          Different projects should customize these scopes and tags based on their architecture and domain.
+          The goal is to enable agents to quickly find related code, understand data flows, and identify cross-cutting patterns.
+          \`\`\`
+
+          This enhanced indexing system supports:
+          - Feature-based code discovery
+          - Architectural layer understanding  
+          - Data flow tracing
+          - Cross-cutting concern identification
+          - API endpoint and middleware discovery
+
+          Make sure to adapt the scopes and tags to match your project's specific architecture and domain.
           `,
         },
       ],

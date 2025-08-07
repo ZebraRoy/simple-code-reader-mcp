@@ -291,6 +291,7 @@ function extractCodeBlocks(content: string): Array<{ code: string, tags: Record<
 
     // Check if this line starts a code block (function, class, etc.)
     const codeBlockStart = line.match(/^\s*(export\s+)?(function|class|interface|enum|const|let|var|void|static|final|abstract)/)
+      || line.match(/^\s*[\w$]+\s*:\s*(async\s+)?(\([^)]*\)\s*=>|\([^)]*\)\s*\{|function|\w)/)
 
     if (codeBlockStart && Object.keys(currentTags).length > 0) {
       if (inCodeBlock && currentBlock.trim()) {

@@ -342,10 +342,10 @@ function matchesQuery(blockTags: Record<string, string[]>, queryScopes: Array<{ 
 }
 
 server.registerTool(
-  "read-code-index",
+  "extract-code-with-index",
   {
-    title: "Read code tool",
-    description: "Read code from the project by querying with scopes and tags. Refer to `code-indexing-instructions.md` for available scopes and tags.",
+    title: "Extract code with index",
+    description: "Extract code from the project by querying with scopes and tags. Refer to `code-indexing-instructions.md` for available scopes and tags.",
     inputSchema: {
       folderPath: z.string().describe("The full path to the folder to read the code from. You can use `pwd` to get the current working directory combined with the relative path."),
       query: z.string().describe("The query using scopes and tags to find code. See `code-indexing-instructions.md`. Use '|' for OR, '&' for AND. Scopes are in brackets. Example: [feature:auth|payment]&[category:math&random]"),
@@ -371,7 +371,7 @@ server.registerTool(
 
             for (const block of matchingBlocks) {
               if (result) result += "\n\n"
-              result += `${relativePath}:${block.startLine}\n\`\`\`\n${block.code}\n\`\`\``
+              result += `**File:** ${relativePath}\n\`\`\`\n${block.code}\n\`\`\``
               matchCount++
             }
           }

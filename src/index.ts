@@ -177,12 +177,19 @@ function extractCodeBlocks(content: string): Array<{ code: string, tags: Record<
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
 
+    // Check if this is a comment line
+    const isCommentLine = line.trim().startsWith("//") || line.trim().startsWith("/*") || line.trim().startsWith("*") || line.trim().startsWith("#")
+
     // Check for indexing tags in comments
     const tagMatch = line.match(/\[(\w+):([^\]]+)\]/)
     if (tagMatch) {
       const [, scope, tagString] = tagMatch
       const tags = tagString.split(/[,|&]/).map(t => t.trim()).filter(Boolean)
       currentTags[scope] = tags
+    }
+
+    // If we're in a comment block or this is a comment line, add to comment buffer
+    if (isCommentLine) {
       commentBuffer += line + "\n"
       continue
     }
@@ -212,8 +219,8 @@ function extractCodeBlocks(content: string): Array<{ code: string, tags: Record<
       }
     }
     else {
-      // Reset comment buffer if we encounter a non-comment line without tags
-      if (!line.trim().startsWith("//") && !line.trim().startsWith("/*") && !line.trim().startsWith("*") && !line.trim().startsWith("#")) {
+      // Reset comment buffer and tags if we encounter a non-comment line without starting a code block
+      if (line.trim() !== "") {
         commentBuffer = ""
         currentTags = {}
       }

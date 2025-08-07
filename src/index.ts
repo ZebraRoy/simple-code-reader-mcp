@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod"
 import { join } from "path"
-import { readFile } from "fs/promises"
+import { readFile, readdir } from "fs/promises"
 
 const server = new McpServer({
   name: "simple-code-reader-mcp",
@@ -95,21 +95,222 @@ server.tool(
   },
 )
 
+async function parseGitignore(rootPath: string): Promise<string[]> {
+  try {
+    const gitignoreContent = await readFile(join(rootPath, ".gitignore"), "utf-8")
+    return gitignoreContent
+      .split("\n")
+      .map(line => line.trim())
+      .filter(line => line && !line.startsWith("#"))
+  }
+  catch {
+    return []
+  }
+}
+
+function shouldIgnore(filePath: string, rootPath: string, gitignorePatterns: string[]): boolean {
+  const relativePath = filePath.replace(rootPath, "").replace(/^\//, "")
+
+  for (const pattern of gitignorePatterns) {
+    if (pattern.endsWith("/")) {
+      if (relativePath.startsWith(pattern) || relativePath.includes("/" + pattern)) {
+        return true
+      }
+    }
+    else if (pattern.includes("*")) {
+      const regex = new RegExp(pattern.replace(/\*/g, ".*"))
+      if (regex.test(relativePath)) {
+        return true
+      }
+    }
+    else if (relativePath === pattern || relativePath.includes("/" + pattern)) {
+      return true
+    }
+  }
+
+  return false
+}
+
+async function scanFiles(dir: string, rootPath: string, respectGitignore: boolean, extensions = [".js", ".ts", ".jsx", ".tsx", ".dart"]): Promise<string[]> {
+  const files: string[] = []
+  const gitignorePatterns = respectGitignore ? await parseGitignore(rootPath) : []
+
+  try {
+    const entries = await readdir(dir, { withFileTypes: true })
+
+    for (const entry of entries) {
+      const fullPath = join(dir, entry.name)
+
+      if (respectGitignore && shouldIgnore(fullPath, rootPath, gitignorePatterns)) {
+        continue
+      }
+
+      if (entry.isDirectory() && !entry.name.startsWith(".") && entry.name !== "node_modules" && entry.name !== "dist" && entry.name !== "build") {
+        files.push(...await scanFiles(fullPath, rootPath, respectGitignore, extensions))
+      }
+      else if (entry.isFile() && extensions.some(ext => entry.name.endsWith(ext))) {
+        files.push(fullPath)
+      }
+    }
+  }
+  catch (_error) {
+    // Ignore access errors and continue
+  }
+
+  return files
+}
+
+function parseQuery(query: string): { scopes: Array<{ name: string, tags: string[] }>, operator: "and" | "or" } {
+  const scopeMatches = query.match(/\[([^\]]+)\]/g) || []
+  const scopes = scopeMatches.map((match) => {
+    const content = match.slice(1, -1) // Remove brackets
+    const [scopeName, ...tagParts] = content.split(":")
+    const tagString = tagParts.join(":")
+    const tags = tagString.split(/[|&]/).map(t => t.trim()).filter(Boolean)
+    return { name: scopeName.trim(), tags }
+  })
+
+  const hasAnd = query.includes("&")
+  const hasOr = query.includes("|")
+  const operator = hasAnd && !hasOr ? "and" : "or"
+
+  return { scopes, operator }
+}
+
+function extractCodeBlocks(content: string): Array<{ code: string, tags: Record<string, string[]>, startLine: number }> {
+  const blocks: Array<{ code: string, tags: Record<string, string[]>, startLine: number }> = []
+  const lines = content.split("\n")
+
+  let currentBlock = ""
+  let currentTags: Record<string, string[]> = {}
+  let blockStartLine = 0
+  let inCodeBlock = false
+  let commentBuffer = ""
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+
+    // Check for indexing tags in comments
+    const tagMatch = line.match(/\[(\w+):([^\]]+)\]/)
+    if (tagMatch) {
+      const [, scope, tagString] = tagMatch
+      const tags = tagString.split(/[,|&]/).map(t => t.trim()).filter(Boolean)
+      currentTags[scope] = tags
+      commentBuffer += line + "\n"
+      continue
+    }
+
+    // Check if this line starts a code block (function, class, etc.)
+    const codeBlockStart = line.match(/^\s*(function|class|interface|enum|const|let|var|void|static|final|abstract)/)
+
+    if (codeBlockStart && Object.keys(currentTags).length > 0) {
+      if (inCodeBlock && currentBlock.trim()) {
+        blocks.push({ code: currentBlock.trim(), tags: { ...currentTags }, startLine: blockStartLine })
+      }
+
+      currentBlock = commentBuffer + line + "\n"
+      blockStartLine = i + 1 - commentBuffer.split("\n").length + 1
+      inCodeBlock = true
+      commentBuffer = ""
+    }
+    else if (inCodeBlock) {
+      currentBlock += line + "\n"
+
+      // Simple heuristic: end block on empty line or next function/class
+      if (line.trim() === "" && lines[i + 1] && lines[i + 1].match(/^\s*(function|class|interface|enum|const|let|var|void|static|final|abstract)/)) {
+        blocks.push({ code: currentBlock.trim(), tags: { ...currentTags }, startLine: blockStartLine })
+        currentBlock = ""
+        currentTags = {}
+        inCodeBlock = false
+      }
+    }
+    else {
+      // Reset comment buffer if we encounter a non-comment line without tags
+      if (!line.trim().startsWith("//") && !line.trim().startsWith("/*") && !line.trim().startsWith("*") && !line.trim().startsWith("#")) {
+        commentBuffer = ""
+        currentTags = {}
+      }
+    }
+  }
+
+  // Add final block if exists
+  if (inCodeBlock && currentBlock.trim()) {
+    blocks.push({ code: currentBlock.trim(), tags: { ...currentTags }, startLine: blockStartLine })
+  }
+
+  return blocks
+}
+
+function matchesQuery(blockTags: Record<string, string[]>, queryScopes: Array<{ name: string, tags: string[] }>, operator: "and" | "or"): boolean {
+  if (queryScopes.length === 0) return true
+
+  const scopeMatches = queryScopes.map((scope) => {
+    const blockScopeTags = blockTags[scope.name] || []
+    return scope.tags.some(tag => blockScopeTags.includes(tag))
+  })
+
+  return operator === "and" ? scopeMatches.every(Boolean) : scopeMatches.some(Boolean)
+}
+
 server.tool(
   "read-code",
-  "Read the code of the project",
+  "Read the code of the project that matches the query",
   {
-    rootPath: z.string().describe("The full path to the root of the project. You can use `pwd` to get the current working directory."),
+    folderPath: z.string().describe("The full path to the folder to read the code from. You can use `pwd` to get the current working directory."),
     query: z.string().describe("The query to read the code. It should be a list of scope and tag. | represents or, & represents and. Square bracket represents a scope. Example: [feature:auth|payment]&[category:math&random]"),
+    respectGitignore: z.boolean().optional().default(true).describe("Whether to respect .gitignore patterns when scanning files"),
   },
-  async ({ rootPath, query }) => {
-    return {
-      content: [
-        {
-          type: "text",
-          text: "",
-        },
-      ],
+  async ({ folderPath, query, respectGitignore }) => {
+    try {
+      const files = await scanFiles(folderPath, folderPath, respectGitignore)
+      const { scopes, operator } = parseQuery(query)
+
+      let result = ""
+      let matchCount = 0
+
+      for (const filePath of files) {
+        try {
+          const content = await readFile(filePath, "utf-8")
+          const blocks = extractCodeBlocks(content)
+          const matchingBlocks = blocks.filter(block => matchesQuery(block.tags, scopes, operator))
+
+          if (matchingBlocks.length > 0) {
+            const relativePath = filePath.replace(folderPath, "").replace(/^\//, "")
+
+            for (const block of matchingBlocks) {
+              if (result) result += "\n\n"
+              result += `${relativePath}:${block.startLine}\n\`\`\`\n${block.code}\n\`\`\``
+              matchCount++
+            }
+          }
+        }
+        catch (_error) {
+          continue
+        }
+      }
+
+      if (matchCount === 0) {
+        result = "No matching code found"
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: result,
+          },
+        ],
+      }
+    }
+    catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error reading code: ${error instanceof Error ? error.message : "Unknown error"}`,
+          },
+        ],
+      }
     }
   },
 )

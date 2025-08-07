@@ -188,7 +188,7 @@ function extractCodeBlocks(content: string): Array<{ code: string, tags: Record<
     }
 
     // Check if this line starts a code block (function, class, etc.)
-    const codeBlockStart = line.match(/^\s*(function|class|interface|enum|const|let|var|void|static|final|abstract)/)
+    const codeBlockStart = line.match(/^\s*(export\s+)?(function|class|interface|enum|const|let|var|void|static|final|abstract)/)
 
     if (codeBlockStart && Object.keys(currentTags).length > 0) {
       if (inCodeBlock && currentBlock.trim()) {
@@ -204,7 +204,7 @@ function extractCodeBlocks(content: string): Array<{ code: string, tags: Record<
       currentBlock += line + "\n"
 
       // Simple heuristic: end block on empty line or next function/class
-      if (line.trim() === "" && lines[i + 1] && lines[i + 1].match(/^\s*(function|class|interface|enum|const|let|var|void|static|final|abstract)/)) {
+      if (line.trim() === "" && lines[i + 1] && lines[i + 1].match(/^\s*(export\s+)?(function|class|interface|enum|const|let|var|void|static|final|abstract)/)) {
         blocks.push({ code: currentBlock.trim(), tags: { ...currentTags }, startLine: blockStartLine })
         currentBlock = ""
         currentTags = {}
@@ -245,7 +245,7 @@ server.registerTool(
     title: "Read code tool",
     description: "Read code from the project by querying with scopes and tags. Refer to `code-indexing-instructions.md` for available scopes and tags.",
     inputSchema: {
-      folderPath: z.string().describe("The full path to the folder to read the code from. You can use `pwd` to get the current working directory."),
+      folderPath: z.string().describe("The full path to the folder to read the code from. You can use `pwd` to get the current working directory combined with the relative path."),
       query: z.string().describe("The query using scopes and tags to find code. See `code-indexing-instructions.md`. Use '|' for OR, '&' for AND. Scopes are in brackets. Example: [feature:auth|payment]&[category:math&random]"),
       respectGitignore: z.boolean().optional().default(true).describe("Whether to respect .gitignore patterns when scanning files"),
     },

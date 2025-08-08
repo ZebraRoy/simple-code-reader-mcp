@@ -285,14 +285,14 @@ function extractCodeBlocks(content: string): Array<{ code: string, tags: Record<
       /^\s*extension\b/,
       /^\s*(async\s+)?function\b/,
       // variable assigned arrow or function (with optional type)
-      /^\s*(export\s+)?(const|let|var)\s+[A-Za-z_$][\w$]*\s*[:<\w\s,<>.?=&\[\]{}()\.]*=\s*(async\s+)?(\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>/,
+      /^\s*(export\s+)?(const|let|var)\s+[A-Za-z_$][\w$]*\s*[:<\w\s,<>.?=&[\]{}().]*=\s*(async\s+)?(\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>/,
       /^\s*(export\s+)?(const|let|var)\s+[A-Za-z_$][\w$]*\s*=\s*function\b/,
       // object property style
       /^\s*[A-Za-z_$][\w$]*\s*:\s*(async\s+)?(function\b|\([^)]*\)\s*=>|\([^)]*\)\s*\{)/,
       // export default arrow
       /^\s*export\s+default\s*(async\s+)?(\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>/,
     ]
-    return patterns.some((re) => re.test(text))
+    return patterns.some(re => re.test(text))
   }
 
   const startNewBlockIfTagged = (line: string, lineIndexZeroBased: number): void => {
@@ -320,7 +320,8 @@ function extractCodeBlocks(content: string): Array<{ code: string, tags: Record<
         inCodeBlock = false
         // Treat this line as a potential new start; only open if there were tags right above
         // No pending comments collected while inside a block, so just continue to normal flow below
-      } else {
+      }
+      else {
         currentBlock += line + "\n"
         continue
       }
@@ -398,7 +399,7 @@ server.registerTool(
     description: "Extract code from the project by querying with scopes and tags. Refer to `code-indexing-instructions.md` for available scopes and tags.",
     inputSchema: {
       folderPath: z.string().describe("The full path to the folder to read the code from. You can use `pwd` to get the current working directory combined with the relative path."),
-          query: z.string().describe("The query using scopes and tags to find code. See `code-indexing-instructions.md`. Use '|' for OR, '&' for AND. Avoid mixing both in the same query. Examples: [feature:auth]&[layer:service] or [feature:auth|payment]"),
+      query: z.string().describe("The query using scopes and tags to find code. See `code-indexing-instructions.md`. Use '|' for OR, '&' for AND. Avoid mixing both in the same query. Examples: [feature:auth]&[layer:service] or [feature:auth|payment]"),
       respectGitignore: z.boolean().optional().default(true).describe("Whether to respect .gitignore patterns when scanning files"),
     },
   },

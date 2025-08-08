@@ -1,6 +1,6 @@
 {
   "name": "simple-code-reader-mcp",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "A simple code reader MCP server",
   "type": "module",
   "repository": {

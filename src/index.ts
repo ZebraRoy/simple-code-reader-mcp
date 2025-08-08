@@ -3,7 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod"
 import { join } from "path"
-import { readFile, readdir } from "fs/promises"
+import { readFile, readdir, writeFile } from "fs/promises"
 
 const server = new McpServer({
   name: "simple-code-reader-mcp",
@@ -19,144 +19,154 @@ server.registerTool(
   "create-code-indexing-instructions",
   {
     title: "Create code indexing instructions",
-    description: "Generate a project-ready `code-indexing-instructions.md` that defines scopes, tagging rules, and query examples for the code extraction tool.",
+    description: "Ensure a `code-indexing-instructions.md` template exists at the project root, then return guidance on how to complete and use it.",
+    inputSchema: {
+      rootPath: z
+        .string()
+        .describe(
+          "Absolute path to the project root where `code-indexing-instructions.md` should exist or be created.",
+        ),
+    },
   },
-  async () => {
+  async ({ rootPath }: { rootPath: string }) => {
+    const filePath = join(rootPath, "code-indexing-instructions.md")
+
+    const template = `# Code Indexing Instructions (Template)
+
+> Notes for AI: Keep it simple and clear.
+> If the requirements are abstract, write concrete user stories.
+
+Purpose: Help developers and agents reliably find code by tagging code blocks with consistent, project-specific scopes and tags. Different projects may define different scopes and tag values. Treat this file as the single source of truth for the tagging contract.
+
+## Project Overview
+- Describe the system in 2-3 sentences.
+- List main domains/features (e.g., auth, payments, user-management).
+
+## Scope Registry (authoritative)
+Define which scopes exist in THIS project and the allowed tag values for each. Mark each scope as open (any new tag allowed) or closed (only the enumerated tags allowed).
+
+Example (customize):
+
+\`\`\`
+scopes:
+  feature:           # What business capability or domain the code serves
+    policy: closed
+    allowed: [auth, payment, user-management, reporting, notifications]
+  layer:             # Where the code lives in the architecture
+    policy: closed
+    allowed: [controller, service, repository, middleware, model, view, utility]
+  api:               # HTTP or RPC surface area
+    policy: open
+    allowed: [endpoint, route, middleware, auth, validation, serialization]
+  data-flow:         # How data moves
+    policy: open
+    allowed: [user-input, validation, database, external-api, cache, queue, transform, response]
+  concern:           # Cross-cutting concerns
+    policy: open
+    allowed: [security, logging, caching, error-handling, performance, config, observability, rate-limiting]
+  type:              # Kind of entity being tagged
+    policy: closed
+    allowed: [function, class, interface, enum, component, hook, constant]
+  package:           # Optional for monorepos; the app/package/module name
+    policy: open
+    allowed: [checkout-web, admin-api, shared-lib]
+\`\`\`
+
+Guidelines:
+- For monorepos, add a \`package\` (or \`module\`) scope and require it.
+- When \`policy: closed\`, update this registry before introducing a new tag.
+
+## How to Tag Code
+- Place tags in comment lines directly above the code block (function, class, component) you want indexed.
+- One scope per line: \`[scope:tag1,tag2]\`. Use multiple lines for multiple scopes.
+- Keep a blank line between distinct code blocks.
+
+Example:
+\`\`\`ts
+/**
+ * Validates user authentication and returns user data
+ * [feature:auth]
+ * [layer:service]
+ * [type:function]
+ * [data-flow:user-input,validation,database]
+ * [concern:security]
+ * [package:admin-api] // optional in monorepos
+ */
+export async function validateUser(token: string) {
+  // ...
+}
+\`\`\`
+
+## Query Syntax
+- Queries are bracketed scopes: \`[scope:tagA,tagB]\`
+- Use \`&\` for AND across scopes; \`|\` or comma for OR within a scope
+- Do not mix \`&\` and \`|\` across scopes in a single query
+
+Examples:
+- All authentication service code: \`[feature:auth]&[layer:service]\`
+- Any auth or payment feature code: \`[feature:auth,payment]\` or \`[feature:auth|payment]\`
+- Trace payment data flow: \`[feature:payment]&[data-flow:user-input,validation,database,response]\`
+- Monorepo: payment endpoints in checkout app: \`[package:checkout-web]&[feature:payment]&[api:endpoint]\`
+
+## Best Practices
+1. Anchor business intent with a \`feature\` tag.
+2. Locate code in the architecture with a \`layer\` tag.
+3. Include \`data-flow\` to trace how data moves.
+4. Reuse consistent tag names; maintain this registry.
+5. Tag API endpoints, routes, and middleware with \`api\`.
+6. For monorepos, always include \`package\`.
+
+## Example: Class and Component
+\`\`\`ts
+/**
+ * User repository abstraction
+ * [feature:user-management]
+ * [layer:repository]
+ * [type:class]
+ * [data-flow:database]
+ */
+export class UserRepository {}
+
+/**
+ * Profile view component
+ * [feature:user-management]
+ * [layer:view]
+ * [type:component]
+ * [package:checkout-web]
+ */
+export function ProfileCard() {}
+\`\`\`
+
+## Maintenance
+- Treat this file as a contract. Update the registry when scopes/tags change.
+`
+
+    let created = false
+    try {
+      await readFile(filePath, "utf-8")
+    }
+    catch {
+      await writeFile(filePath, template, "utf-8")
+      created = true
+    }
+
+    const guidance = [
+      `${created ? "Created" : "Found existing"} template at: ${filePath}`,
+      "\nHow to use this template:",
+      "1) Open the file and customize 'Project Overview' and 'Core Scopes' for your app.",
+      "2) Start tagging code blocks using bracketed scopes directly above them.",
+      "3) Prefer consistent, kebab-case tags; reuse the same tags across files.",
+      "4) To retrieve code, run the extraction tool with queries like:",
+      "   - [feature:auth]&[layer:service]",
+      "   - [feature:payment]|[concern:security]",
+      "5) Keep the file updated as new features or scopes are introduced.",
+    ].join("\n")
+
     return {
       content: [
         {
           type: "text",
-          text: `The code indexing instructions should be named "code-indexing-instructions.md" and placed in the root of the project. The instructions should be in markdown format. Here is the recommended template:
-
-          \`\`\`markdown
-          # Code Indexing Instructions
-
-          Purpose: Help agents reliably find code by tagging code blocks with consistent scopes and tags. The extraction tool queries these tags to assemble relevant code context.
-
-          ## How to Tag Code
-
-          - Place tags in comment lines directly above the code block (function, class, component) that you want indexed.
-          - Use the syntax: \`[scope:tag1,tag2,tag3]\`
-          - Multiple scopes can be stacked with separate lines.
-          - Use lowercase, kebab-case for tag names; avoid spaces (e.g., \`user-management\`, not \`User Management\`).
-          - Keep a blank line between distinct code blocks to improve detection.
-
-          \`\`\`javascript
-          /**
-           * Validates user authentication and returns user data
-           * [feature:auth]
-           * [layer:service]
-           * [type:function]
-           * [data-flow:user-input,validation,database]
-           * [api:endpoint]
-           * [concern:security,validation]
-           */
-          export async function validateUser(token) {
-            // ...
-            return userData
-          }
-
-          /**
-           * Adds authentication header to all API requests
-           * [feature:auth]
-           * [layer:middleware]
-           * [type:function]
-           * [data-flow:request-intercept,header-injection]
-           * [api:middleware,header]
-           * [concern:security,cross-cutting]
-           */
-          export function addAuthHeader(config) {
-            // ...
-            return config
-          }
-          \`\`\`
-
-          ## Core Scopes
-
-          - feature: business capabilities (e.g., \`auth\`, \`payment\`, \`user-management\`, \`notification\`, \`reporting\`, \`search\`, \`file-upload\`, \`admin\`)
-          - layer: architectural layers (\`controller\`, \`service\`, \`repository\`, \`middleware\`, \`model\`, \`view\`, \`utility\`)
-          - api: endpoint and API mechanics (\`endpoint\`, \`route\`, \`middleware\`, \`header\`, \`auth\`, \`validation\`, \`serialization\`)
-          - data-flow: movement and transformation (\`user-input\`, \`validation\`, \`database\`, \`external-api\`, \`cache\`, \`queue\`, \`transform\`, \`response\`, \`request-intercept\`, \`header-injection\`)
-          - concern: cross-cutting concerns (\`security\`, \`logging\`, \`caching\`, \`validation\`, \`error-handling\`, \`performance\`, \`cross-cutting\`, \`config\`, \`observability\`, \`rate-limiting\`, \`idempotency\`)
-          - type: code structure (\`function\`, \`class\`, \`interface\`, \`enum\`, \`component\`, \`hook\`, \`constant\`)
-
-          Note: You may introduce additional scopes if needed (e.g., \`module\`, \`platform\`, \`test\`), but keep usage consistent.
-
-          ## Query Syntax
-
-          - Queries are composed of bracketed scopes: \`[scope:tagA,tagB]\`
-          - Operators across scopes:
-            - \`&\` means AND across scopes (all must match)
-            - \`|\` means OR across scopes (any may match)
-          - Do not mix \`&\` and \`|\` in the same query; the engine uses a single global operator and treats any query containing \`|\` as OR.
-          - Inside brackets, prefer commas to separate multiple tags.
-
-          Examples:
-          - All authentication service code:
-            \`[feature:auth]&[layer:service]\`
-          - Any code about authentication or payment:
-            \`[feature:auth,payment]\` or \`[feature:auth|payment]\`
-          - Understand data flow for payments:
-            \`[feature:payment]&[data-flow:user-input,validation,database,response]\`
-          - Add headers across APIs:
-            \`[api:header,middleware]&[concern:cross-cutting]\`
-          - Authentication-related code (feature or security concern):
-            \`[feature:auth]|[concern:security]\`
-
-          ## Best Practices
-
-          1. Comprehensive tagging: Apply multiple scopes per code block for richer context.
-          2. Feature-first: Always include a \`feature\` tag to anchor business intent.
-          3. Layer awareness: Add a \`layer\` to locate code in the architecture.
-          4. Data flow: Include \`data-flow\` tags to trace how data moves through the system.
-          5. Cross-cutting: Mark shared code (e.g., \`logging\`, \`security\`) with \`concern\`.
-          6. Consistency: Reuse the same tag names project-wide; prefer lowercase, kebab-case.
-          7. API discoverability: Tag anything related to endpoints, routes, or middleware with \`api\`.
-
-          ## Language and File Coverage
-
-          - The current indexer scans: \`.js\`, \`.ts\`, \`.jsx\`, \`.tsx\`, \`.dart\`.
-          - Comment markers recognized include \`//\`, \`/* ... */\`, \`*\` (block), and \`#\`.
-          - Place tags immediately above the code you want extracted.
-
-          ## Example: Class and Component
-
-          \`\`\`javascript
-          /**
-           * User repository abstraction
-           * [feature:user-management]
-           * [layer:repository]
-           * [type:class]
-           * [data-flow:database]
-           * [concern:error-handling]
-           */
-          export class UserRepository {
-            // ...
-          }
-
-          /**
-           * Profile view component
-           * [feature:user-management]
-           * [layer:view]
-           * [type:component]
-           */
-          export function ProfileCard(props) {
-            // ...
-          }
-          \`\`\`
-
-          Customize scopes and tags as needed for your domain. The goal is fast, accurate retrieval of related code, data flows, and cross-cutting behaviors.
-          \`\`\`
-
-          This enhanced indexing system supports:
-          - Feature-based code discovery
-          - Architectural layer understanding
-          - Data flow tracing
-          - Cross-cutting concern identification
-          - API endpoint and middleware discovery
-
-          Make sure to adapt the scopes and tags to match your project's specific architecture and domain.
-          `,
+          text: guidance,
         },
       ],
     }
@@ -267,7 +277,7 @@ function extractCodeBlocks(content: string): Array<{ code: string, tags: Record<
   }
 
   const captureTagsFromComment = (text: string): void => {
-    const tagRegex = /\[(\w+):([^\]]+)\]/g
+    const tagRegex = /\[([a-zA-Z0-9_-]+):([^\]]+)\]/g
     let m: RegExpExecArray | null
     while ((m = tagRegex.exec(text)) !== null) {
       const scope = m[1]

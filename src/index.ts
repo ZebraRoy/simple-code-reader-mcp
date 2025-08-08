@@ -19,19 +19,27 @@ server.registerTool(
   "create-code-indexing-instructions",
   {
     title: "Create code indexing instructions",
-    description: "Create instructions of how to index the code for code reader",
+    description: "Generate a project-ready `code-indexing-instructions.md` that defines scopes, tagging rules, and query examples for the code extraction tool.",
   },
   async () => {
     return {
       content: [
         {
           type: "text",
-          text: `The code indexing instructions should be named "code-indexing-instructions.md" and placed in the root of the project. The instructions should be in markdown format. Here is the enhanced format of instruction to support feature-based queries, data flow tracking, and cross-cutting concerns:
+          text: `The code indexing instructions should be named "code-indexing-instructions.md" and placed in the root of the project. The instructions should be in markdown format. Here is the recommended template:
 
           \`\`\`markdown
           # Code Indexing Instructions
 
-          Use [scope:tag,tag,tag] to describe the scope of the code. Multiple scopes can be used to provide comprehensive indexing.
+          Purpose: Help agents reliably find code by tagging code blocks with consistent scopes and tags. The extraction tool queries these tags to assemble relevant code context.
+
+          ## How to Tag Code
+
+          - Place tags in comment lines directly above the code block (function, class, component) that you want indexed.
+          - Use the syntax: \`[scope:tag1,tag2,tag3]\`
+          - Multiple scopes can be stacked with separate lines.
+          - Use lowercase, kebab-case for tag names; avoid spaces (e.g., \`user-management\`, not \`User Management\`).
+          - Keep a blank line between distinct code blocks to improve detection.
 
           \`\`\`javascript
           /**
@@ -43,9 +51,9 @@ server.registerTool(
            * [api:endpoint]
            * [concern:security,validation]
            */
-          async function validateUser(token) {
-            // validation logic
-            return userData;
+          export async function validateUser(token) {
+            // ...
+            return userData
           }
 
           /**
@@ -57,114 +65,92 @@ server.registerTool(
            * [api:middleware,header]
            * [concern:security,cross-cutting]
            */
-          function addAuthHeader(config) {
-            config.headers.Authorization = \`Bearer \${token}\`;
-            return config;
+          export function addAuthHeader(config) {
+            // ...
+            return config
           }
           \`\`\`
 
-          ## Core Scopes for Feature-Based Development
+          ## Core Scopes
 
-          ### Scope: Feature
-          Identifies business features and functional domains. Examples:
-          - auth: authentication and authorization
-          - payment: payment processing and billing
-          - user-management: user profiles and account management
-          - notification: messaging and alerts
-          - reporting: analytics and data visualization
-          - search: search functionality and indexing
-          - file-upload: file handling and storage
-          - admin: administrative functions
+          - feature: business capabilities (e.g., \`auth\`, \`payment\`, \`user-management\`, \`notification\`, \`reporting\`, \`search\`, \`file-upload\`, \`admin\`)
+          - layer: architectural layers (\`controller\`, \`service\`, \`repository\`, \`middleware\`, \`model\`, \`view\`, \`utility\`)
+          - api: endpoint and API mechanics (\`endpoint\`, \`route\`, \`middleware\`, \`header\`, \`auth\`, \`validation\`, \`serialization\`)
+          - data-flow: movement and transformation (\`user-input\`, \`validation\`, \`database\`, \`external-api\`, \`cache\`, \`queue\`, \`transform\`, \`response\`, \`request-intercept\`, \`header-injection\`)
+          - concern: cross-cutting concerns (\`security\`, \`logging\`, \`caching\`, \`validation\`, \`error-handling\`, \`performance\`, \`cross-cutting\`, \`config\`, \`observability\`, \`rate-limiting\`, \`idempotency\`)
+          - type: code structure (\`function\`, \`class\`, \`interface\`, \`enum\`, \`component\`, \`hook\`, \`constant\`)
 
-          ### Scope: Layer
-          Describes architectural layers for understanding code organization:
-          - controller: request handling and routing
-          - service: business logic and domain operations  
-          - repository: data access and persistence
-          - middleware: request/response processing
-          - model: data structures and entities
-          - view: presentation and UI components
-          - utility: helper functions and shared code
+          Note: You may introduce additional scopes if needed (e.g., \`module\`, \`platform\`, \`test\`), but keep usage consistent.
 
-          ### Scope: API
-          Identifies API-related code for endpoint discovery:
-          - endpoint: REST API endpoints
-          - route: routing definitions
-          - middleware: API middleware
-          - header: header manipulation
-          - auth: API authentication
-          - validation: request/response validation
-          - serialization: data transformation
+          ## Query Syntax
 
-          ### Scope: Data-Flow
-          Tracks data movement and transformation for understanding feature flows:
-          - user-input: receives user data
-          - validation: validates data
-          - database: database operations
-          - external-api: calls external services
-          - cache: caching operations
-          - queue: message queuing
-          - transform: data transformation
-          - response: response generation
-          - request-intercept: intercepts requests
-          - header-injection: adds headers
+          - Queries are composed of bracketed scopes: \`[scope:tagA,tagB]\`
+          - Operators across scopes:
+            - \`&\` means AND across scopes (all must match)
+            - \`|\` means OR across scopes (any may match)
+          - Do not mix \`&\` and \`|\` in the same query; the engine uses a single global operator and treats any query containing \`|\` as OR.
+          - Inside brackets, prefer commas to separate multiple tags.
 
-          ### Scope: Concern
-          Identifies cross-cutting concerns that span multiple features:
-          - security: security-related code
-          - logging: logging and monitoring
-          - caching: caching strategies
-          - validation: data validation
-          - error-handling: error management
-          - performance: performance optimizations
-          - cross-cutting: affects multiple features
-          - config: configuration management
-
-          ### Scope: Type
-          Describes code structure types:
-          - function: functions and methods
-          - class: class definitions
-          - interface: type interfaces
-          - enum: enumeration types
-          - component: UI components
-          - hook: custom hooks (React/Vue)
-          - constant: constants and configurations
-
-          ## Query Examples for Common Use Cases
-
-          ### Get all API-related code for a feature:
-          \`[feature:auth]&[api:endpoint|middleware|header]\`
-
-          ### Understand data flow of a feature:
-          \`[feature:payment]&[data-flow:user-input|validation|database|response]\`
-
-          ### Find how to add headers to all APIs:
-          \`[api:header|middleware]&[concern:cross-cutting]\`
-
-          ### Get all authentication-related code:
-          \`[feature:auth]|[concern:security]\`
-
-          ### Find service layer code for user management:
-          \`[feature:user-management]&[layer:service]\`
+          Examples:
+          - All authentication service code:
+            \`[feature:auth]&[layer:service]\`
+          - Any code about authentication or payment:
+            \`[feature:auth,payment]\` or \`[feature:auth|payment]\`
+          - Understand data flow for payments:
+            \`[feature:payment]&[data-flow:user-input,validation,database,response]\`
+          - Add headers across APIs:
+            \`[api:header,middleware]&[concern:cross-cutting]\`
+          - Authentication-related code (feature or security concern):
+            \`[feature:auth]|[concern:security]\`
 
           ## Best Practices
 
-          1. **Comprehensive Tagging**: Use multiple scopes to provide rich context
-          2. **Feature-First**: Always include feature scope for business domain identification
-          3. **Layer Awareness**: Include layer scope to understand architectural position
-          4. **Data Flow Tracking**: Use data-flow scope to trace information movement
-          5. **Cross-Cutting Identification**: Tag code that affects multiple features
-          6. **Consistent Naming**: Use consistent tag names across the project
-          7. **Specific Tags**: Prefer specific tags over generic ones
-          8. **API Documentation**: Always tag API-related code for discoverability
+          1. Comprehensive tagging: Apply multiple scopes per code block for richer context.
+          2. Feature-first: Always include a \`feature\` tag to anchor business intent.
+          3. Layer awareness: Add a \`layer\` to locate code in the architecture.
+          4. Data flow: Include \`data-flow\` tags to trace how data moves through the system.
+          5. Cross-cutting: Mark shared code (e.g., \`logging\`, \`security\`) with \`concern\`.
+          6. Consistency: Reuse the same tag names project-wide; prefer lowercase, kebab-case.
+          7. API discoverability: Tag anything related to endpoints, routes, or middleware with \`api\`.
 
-          Different projects should customize these scopes and tags based on their architecture and domain.
-          The goal is to enable agents to quickly find related code, understand data flows, and identify cross-cutting patterns.
+          ## Language and File Coverage
+
+          - The current indexer scans: \`.js\`, \`.ts\`, \`.jsx\`, \`.tsx\`, \`.dart\`.
+          - Comment markers recognized include \`//\`, \`/* ... */\`, \`*\` (block), and \`#\`.
+          - Place tags immediately above the code you want extracted.
+
+          ## Example: Class and Component
+
+          \`\`\`javascript
+          /**
+           * User repository abstraction
+           * [feature:user-management]
+           * [layer:repository]
+           * [type:class]
+           * [data-flow:database]
+           * [concern:error-handling]
+           */
+          export class UserRepository {
+            // ...
+          }
+
+          /**
+           * Profile view component
+           * [feature:user-management]
+           * [layer:view]
+           * [type:component]
+           */
+          export function ProfileCard(props) {
+            // ...
+          }
+          \`\`\`
+
+          Customize scopes and tags as needed for your domain. The goal is fast, accurate retrieval of related code, data flows, and cross-cutting behaviors.
           \`\`\`
 
           This enhanced indexing system supports:
           - Feature-based code discovery
-          - Architectural layer understanding  
+          - Architectural layer understanding
           - Data flow tracing
           - Cross-cutting concern identification
           - API endpoint and middleware discovery
@@ -182,8 +168,8 @@ async function parseGitignore(rootPath: string): Promise<string[]> {
     const gitignoreContent = await readFile(join(rootPath, ".gitignore"), "utf-8")
     return gitignoreContent
       .split("\n")
-      .map(line => line.trim())
-      .filter(line => line && !line.startsWith("#"))
+      .map((line: string) => line.trim())
+      .filter((line: string) => line && !line.startsWith("#"))
   }
   catch {
     return []
@@ -263,69 +249,132 @@ function extractCodeBlocks(content: string): Array<{ code: string, tags: Record<
   const blocks: Array<{ code: string, tags: Record<string, string[]>, startLine: number }> = []
   const lines = content.split("\n")
 
-  let currentBlock = ""
-  let currentTags: Record<string, string[]> = {}
-  let blockStartLine = 0
+  // State for an active extracted block
   let inCodeBlock = false
-  let commentBuffer = ""
+  let currentBlock = ""
+  let currentBlockTags: Record<string, string[]> = {}
+  let blockStartLine = 0
+
+  // State for pending comments/tags immediately above a potential code block
+  let pendingCommentBuffer = ""
+  let pendingTags: Record<string, string[]> = {}
+  let pendingCommentStartLine: number | null = null
+  let pendingDecoratorBuffer = ""
+
+  const isCommentLine = (text: string): boolean => {
+    const trimmed = text.trim()
+    return trimmed.startsWith("//") || trimmed.startsWith("/*") || trimmed.startsWith("*") || trimmed.startsWith("#")
+  }
+
+  const captureTagsFromComment = (text: string): void => {
+    const tagRegex = /\[(\w+):([^\]]+)\]/g
+    let m: RegExpExecArray | null
+    while ((m = tagRegex.exec(text)) !== null) {
+      const scope = m[1]
+      const tags = m[2].split(/[,|&]/).map(t => t.trim()).filter(Boolean)
+      pendingTags[scope] = tags
+    }
+  }
+
+  const isCodeBlockStart = (text: string): boolean => {
+    const patterns: RegExp[] = [
+      /^\s*(export\s+)?(default\s+)?(async\s+)?(function|class|interface|enum|type|namespace|module)\b/,
+      // Dart/TS modifiers before class or constructs
+      /^\s*(abstract|final|sealed|base)\s+class\b/,
+      /^\s*mixin\b/,
+      /^\s*extension\b/,
+      /^\s*(async\s+)?function\b/,
+      // variable assigned arrow or function (with optional type)
+      /^\s*(export\s+)?(const|let|var)\s+[A-Za-z_$][\w$]*\s*[:<\w\s,<>.?=&\[\]{}()\.]*=\s*(async\s+)?(\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>/,
+      /^\s*(export\s+)?(const|let|var)\s+[A-Za-z_$][\w$]*\s*=\s*function\b/,
+      // object property style
+      /^\s*[A-Za-z_$][\w$]*\s*:\s*(async\s+)?(function\b|\([^)]*\)\s*=>|\([^)]*\)\s*\{)/,
+      // export default arrow
+      /^\s*export\s+default\s*(async\s+)?(\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>/,
+    ]
+    return patterns.some((re) => re.test(text))
+  }
+
+  const startNewBlockIfTagged = (line: string, lineIndexZeroBased: number): void => {
+    if (Object.keys(pendingTags).length === 0) return
+    currentBlock = pendingCommentBuffer + pendingDecoratorBuffer + line + "\n"
+    blockStartLine = pendingCommentStartLine ?? (lineIndexZeroBased + 1)
+    currentBlockTags = { ...pendingTags }
+    inCodeBlock = true
+    pendingCommentBuffer = ""
+    pendingTags = {}
+    pendingCommentStartLine = null
+    pendingDecoratorBuffer = ""
+  }
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
 
-    // Check if this is a comment line
-    const isCommentLine = line.trim().startsWith("//") || line.trim().startsWith("/*") || line.trim().startsWith("*") || line.trim().startsWith("#")
-
-    // Check for indexing tags in comments
-    const tagMatch = line.match(/\[(\w+):([^\]]+)\]/)
-    if (tagMatch) {
-      const [, scope, tagString] = tagMatch
-      const tags = tagString.split(/[,|&]/).map(t => t.trim()).filter(Boolean)
-      currentTags[scope] = tags
+    if (inCodeBlock) {
+      // Append verbatim while inside a captured block
+      if (isCodeBlockStart(line)) {
+        // Close current block before considering new start
+        blocks.push({ code: currentBlock.trim(), tags: { ...currentBlockTags }, startLine: blockStartLine })
+        currentBlock = ""
+        currentBlockTags = {}
+        inCodeBlock = false
+        // Treat this line as a potential new start; only open if there were tags right above
+        // No pending comments collected while inside a block, so just continue to normal flow below
+      } else {
+        currentBlock += line + "\n"
+        continue
+      }
     }
 
-    // If we're in a comment block or this is a comment line, add to comment buffer
-    if (isCommentLine) {
-      commentBuffer += line + "\n"
+    // Not in a block here
+    if (isCommentLine(line)) {
+      if (pendingCommentBuffer === "") {
+        pendingCommentStartLine = i + 1
+      }
+      pendingCommentBuffer += line + "\n"
+      captureTagsFromComment(line)
       continue
     }
 
-    // Check if this line starts a code block (function, class, etc.)
-    const codeBlockStart = line.match(/^\s*(export\s+)?(function|class|interface|enum|const|let|var|void|static|final|abstract)/)
-      || line.match(/^\s*[\w$]+\s*:\s*(async\s+)?(\([^)]*\)\s*=>|\([^)]*\)\s*\{|function|\w)/)
-
-    if (codeBlockStart && Object.keys(currentTags).length > 0) {
-      if (inCodeBlock && currentBlock.trim()) {
-        blocks.push({ code: currentBlock.trim(), tags: { ...currentTags }, startLine: blockStartLine })
+    // Dart/TS annotations/decorators directly above classes/functions should not break adjacency
+    if (line.trim().startsWith("@")) {
+      // Only keep decorators if we already have pending tags/comments right above
+      if (pendingCommentBuffer !== "" || Object.keys(pendingTags).length > 0) {
+        pendingDecoratorBuffer += line + "\n"
+        continue
       }
-
-      currentBlock = commentBuffer + line + "\n"
-      blockStartLine = i + 1 - commentBuffer.split("\n").length + 1
-      inCodeBlock = true
-      commentBuffer = ""
+      // If no pending tags, treat as a normal non-comment line below (which will reset buffers)
     }
-    else if (inCodeBlock) {
-      currentBlock += line + "\n"
 
-      // Simple heuristic: end block on empty line or next function/class
-      if (line.trim() === "" && lines[i + 1] && lines[i + 1].match(/^\s*(export\s+)?(function|class|interface|enum|const|let|var|void|static|final|abstract)/)) {
-        blocks.push({ code: currentBlock.trim(), tags: { ...currentTags }, startLine: blockStartLine })
-        currentBlock = ""
-        currentTags = {}
-        inCodeBlock = false
+    if (isCodeBlockStart(line)) {
+      startNewBlockIfTagged(line, i)
+      if (!inCodeBlock) {
+        // no tags; discard stray comments
+        pendingCommentBuffer = ""
+        pendingTags = {}
+        pendingCommentStartLine = null
+        pendingDecoratorBuffer = ""
       }
+      continue
     }
-    else {
-      // Reset comment buffer and tags if we encounter a non-comment line without starting a code block
-      if (line.trim() !== "") {
-        commentBuffer = ""
-        currentTags = {}
-      }
+
+    // If we are collecting decorators/annotations, keep accumulating lines until a code start is found
+    if (pendingDecoratorBuffer !== "") {
+      pendingDecoratorBuffer += line + "\n"
+      continue
+    }
+
+    // Any other non-empty line breaks adjacency of pending comments to a code start
+    if (line.trim() !== "") {
+      pendingCommentBuffer = ""
+      pendingTags = {}
+      pendingCommentStartLine = null
+      pendingDecoratorBuffer = ""
     }
   }
 
-  // Add final block if exists
   if (inCodeBlock && currentBlock.trim()) {
-    blocks.push({ code: currentBlock.trim(), tags: { ...currentTags }, startLine: blockStartLine })
+    blocks.push({ code: currentBlock.trim(), tags: { ...currentBlockTags }, startLine: blockStartLine })
   }
 
   return blocks
@@ -349,7 +398,7 @@ server.registerTool(
     description: "Extract code from the project by querying with scopes and tags. Refer to `code-indexing-instructions.md` for available scopes and tags.",
     inputSchema: {
       folderPath: z.string().describe("The full path to the folder to read the code from. You can use `pwd` to get the current working directory combined with the relative path."),
-      query: z.string().describe("The query using scopes and tags to find code. See `code-indexing-instructions.md`. Use '|' for OR, '&' for AND. Scopes are in brackets. Example: [feature:auth|payment]&[category:math&random]"),
+          query: z.string().describe("The query using scopes and tags to find code. See `code-indexing-instructions.md`. Use '|' for OR, '&' for AND. Avoid mixing both in the same query. Examples: [feature:auth]&[layer:service] or [feature:auth|payment]"),
       respectGitignore: z.boolean().optional().default(true).describe("Whether to respect .gitignore patterns when scanning files"),
     },
   },

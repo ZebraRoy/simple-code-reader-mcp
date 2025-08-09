@@ -36,7 +36,9 @@ server.registerTool(
 > Notes for AI: Keep it simple and clear.
 > If the requirements are abstract, write concrete user stories.
 
-Purpose: Help developers and agents reliably find code by tagging code blocks with consistent, project-specific scopes and tags. Different projects may define different scopes and tag values. Treat this file as the single source of truth for the tagging contract.
+      Purpose: Help developers and agents reliably find code by tagging code blocks with consistent, project-specific scopes and tags. Different projects may define different scopes and tag values. Treat this file as the single source of truth for the tagging contract.
+
+      Important: Indexing is NOT limited to top-level exported declarations. Tag any meaningful code block that should be discoverable, including exported and non-exported top-level declarations, variable-assigned functions (arrow or function expressions), object-property handlers, and default exports. Place tags immediately above the block you want indexed.
 
 ## Project Overview
 - Describe the system in 2-3 sentences.
@@ -76,26 +78,57 @@ Guidelines:
 - For monorepos, add a \`package\` (or \`module\`) scope and require it.
 - When \`policy: closed\`, update this registry before introducing a new tag.
 
-## How to Tag Code
-- Place tags in comment lines directly above the code block (function, class, component) you want indexed.
-- One scope per line: \`[scope:tag1,tag2]\`. Use multiple lines for multiple scopes.
-- Keep a blank line between distinct code blocks.
+      ## How to Tag Code
+      - Place tags in comment lines directly above the code block (function, class, component) you want indexed.
+      - One scope per line: \`[scope:tag1,tag2]\`. Use multiple lines for multiple scopes.
+      - Keep a blank line between distinct code blocks.
+      - You do NOT need an \`export\` for a block to be indexed. Exported and non-exported top-level blocks are both supported.
+      - Supported starts include: \`function\`, \`class\`, \`interface\`, \`enum\`, \`type\`, \`namespace\`, \`module\`, variable-assigned arrows/functions, object-property functions, and \`export default\` arrows/functions.
 
-Example:
-\`\`\`ts
-/**
- * Validates user authentication and returns user data
- * [feature:auth]
- * [layer:service]
- * [type:function]
- * [data-flow:user-input,validation,database]
- * [concern:security]
- * [package:admin-api] // optional in monorepos
- */
-export async function validateUser(token: string) {
-  // ...
-}
-\`\`\`
+      Examples (various forms):
+      \`\`\`ts
+      /**
+       * Validates user authentication and returns user data
+       * [feature:auth]
+       * [layer:service]
+       * [type:function]
+       * [data-flow:user-input,validation,database]
+       * [concern:security]
+       * [package:admin-api] // optional in monorepos
+       */
+      async function validateUser(token: string) {
+        // ...
+      }
+      \`\`\`
+
+      Top-level const arrow (non-export):
+      \`\`\`ts
+      /**
+       * [feature:auth]
+       * [layer:service]
+       * [type:function]
+       */
+      const parseJwt = (token: string) => {
+        // ...
+      }
+      \`\`\`
+
+      Object property handler (e.g., route map):
+      \`\`\`ts
+      const handlers = {
+        /**
+         * [feature:auth]
+         * [layer:controller]
+         * [type:function]
+         * [api:endpoint]
+         */
+        login: async (req: any, res: any) => {
+          // ...
+        }
+      }
+      \`\`\`
+
+      
 
 ## Query Syntax
 - Queries are bracketed scopes: \`[scope:tagA,tagB]\`
